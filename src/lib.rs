@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate ndarray;
+// #[macro_use]
+// extern crate ndarray;
 use ndarray::{Array1, Array2};
 
 pub mod act_fn;
@@ -60,10 +60,4 @@ impl Network {
         }
         output_array
     }
-}
-
-fn aa() {
-    // let w: Array2<f64> = array![[0.1, 0.3, 0.5], [0.2, 0.4, 0.6]];
-    // let x: Array1<f64> = array![1.0, 0.5];
-    // let b: Array1<f64> = x.dot(&w);
 }
