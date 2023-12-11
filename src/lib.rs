@@ -1,20 +1,9 @@
 use std::rc::Rc;
 
-// #[macro_use]
-// extern crate ndarray;
 use ndarray::{Array1, Array2};
 
 pub mod act_fn;
 
-// pub trait LayerBase {
-//     fn weight_matrix(&self) -> &Array2<f64>;
-//     fn bias_array(&self) -> &Array1<f64>;
-//     fn activate(&self, x: Array1<f64>) -> Array1<f64>;
-//     fn forward(&self, x: &Array1<f64>) -> Array1<f64> {
-//         self.activate(x.dot(self.weight_matrix()) + self.bias_array())
-//     }
-//     // fn backward(&self, x: &Array1<f64>, dx: &Array1<f64>) -> &Array1<f64>;
-// }
 
 pub enum LayerType {
     Hidden,
@@ -44,7 +33,35 @@ impl Layer {
         }
     }
 
+    // hidden層 活性化関数：シグノイド関数 として実装
+    pub fn calc_output_first_layer(&mut self, x: &Array2<f64>) {
+        if self.prev_layer.is_some() {
+            panic!("is not first layer");
+        }
 
+        let u = x.dot(&self.weight_matrix) + &self.bias_array;
+
+        self.output_array = u.map(|u| act_fn::sigmoid(*u));
+    }
+
+    pub fn calc_output_other_layer(&mut self) {
+        if self.prev_layer.is_none() {
+            panic!("is first layer");
+        }
+
+        let prev_layer_output_array = self.prev_layer.as_ref().unwrap().output_array.clone();
+
+        let u = prev_layer_output_array.dot(&self.weight_matrix) + &self.bias_array;
+
+        match self.layer_type {
+            LayerType::Hidden => {
+                self.output_array = u.map(|u| act_fn::sigmoid(*u));
+            },
+            LayerType::Output => {
+                self.output_array = act_fn::batch_softmax(&u);
+            },
+        }
+    }
 
     /// 活性化関数：ソフトマックス関数 として実装
     pub fn calc_du_output_layer(&mut self, t: &Array2<f64>) {
@@ -84,35 +101,3 @@ impl Layer {
         }
     }
 }
-
-// impl LayerBase for Layer {
-//     fn weight_matrix(&self) -> &Array2<f64> {
-//         &self.weight_matrix
-//     }
-//     fn bias_array(&self) -> &Array1<f64> {
-//         &self.bias_array
-//     }
-//     fn activate(&self, x: Array1<f64>) -> Array1<f64> {
-//         (self.activate)(x)
-//     }
-// }
-
-// pub struct Network {
-//     layers: Vec<Layer>,
-// }
-
-// impl Network {
-//     pub fn new(layers: Vec<Layer>) -> Network {
-//         Network {
-//             layers: layers,
-//         }
-//     }
-
-//     pub fn output(&self, x: &Array1<f64>) -> Array1<f64> {
-//         let mut output_array: Array1<f64> = x.clone();
-//         for layer in &self.layers {
-//             output_array = layer.forward(&output_array);
-//         }
-//         output_array
-//     }
-// }

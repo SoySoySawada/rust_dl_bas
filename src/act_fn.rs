@@ -1,4 +1,4 @@
-use ndarray::Array1;
+use ndarray::{Array1, Array2};
 
 
 
@@ -21,6 +21,11 @@ pub fn relu(x: f64) -> f64 {
 }
 
 pub fn softmax(x: &Array1<f64>) -> Array1<f64> {
+    let expsum: f64 = x.iter().map(|&x| x.exp()).sum();
+    x.map(|&x| x.exp() / expsum)
+}
+
+pub fn batch_softmax(x: &Array2<f64>) -> Array2<f64> {
     let expsum: f64 = x.iter().map(|&x| x.exp()).sum();
     x.map(|&x| x.exp() / expsum)
 }
