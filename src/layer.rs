@@ -27,10 +27,18 @@ impl Layer {
             output_array: Array2::zeros((batch_size, cell_num)),
             du: Array2::zeros((batch_size, cell_num)),
             layer_type,
-            next_layer: None,
             prev_layer: None,
+            next_layer: None,
         }
     }
+
+    pub fn set_prev_layer(&mut self, prev_layer: Rc<Layer>) {
+        self.prev_layer = Some(prev_layer);
+    }
+    pub fn set_next_layer(&mut self, next_layer: Rc<Layer>) {
+        self.next_layer = Some(next_layer);
+    }
+
 
     // hidden層 活性化関数：シグノイド関数 として実装
     pub fn calc_output_first_layer(&mut self, x: &Array2<f64>) {
