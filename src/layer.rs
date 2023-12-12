@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, cell::RefCell};
 
 use ndarray::{Array1, Array2};
 
@@ -15,8 +15,8 @@ pub struct Layer {
     pub output_array: Array2<f64>,
     pub du: Array2<f64>,
     layer_type: LayerType,
-    next_layer: Option<Rc<Layer>>,
-    prev_layer: Option<Rc<Layer>>,
+    next_layer: Option<Rc<RefCell<Layer>>>,
+    prev_layer: Option<Rc<RefCell<Layer>>>,
 }
 
 impl Layer {
@@ -31,14 +31,14 @@ impl Layer {
             next_layer: None,
         }
     }
-
-    pub fn set_prev_layer(&mut self, prev_layer: Rc<Layer>) {
-        self.prev_layer = Some(prev_layer);
-    }
-    pub fn set_next_layer(&mut self, next_layer: Rc<Layer>) {
-        self.next_layer = Some(next_layer);
+    
+    pub fn set_next_layer(&mut self, next_layer: Rc<RefCell<Layer>>) {
+        self.next_layer.replace(next_layer);
     }
 
+    pub fn set_prev_layer(&mut self, prev_layer: Rc<RefCell<Layer>>) {
+        self.prev_layer.replace(prev_layer);
+    }
 
     // hidden層 活性化関数：シグノイド関数 として実装
     pub fn calc_output_first_layer(&mut self, x: &Array2<f64>) {
@@ -56,7 +56,7 @@ impl Layer {
             panic!("is first layer");
         }
 
-        let prev_layer_output_array = self.prev_layer.as_ref().unwrap().output_array.clone();
+        let prev_layer_output_array = self.prev_layer.as_ref().unwrap().borrow().output_array.clone();
 
         let u = prev_layer_output_array.dot(&self.weight_matrix) + &self.bias_array;
 
@@ -92,9 +92,8 @@ impl Layer {
             LayerType::Hidden => {
                 // dE/du を解析的に計算
 
-
-                let next_layer_du = self.next_layer.as_ref().unwrap().du.clone();
-                let next_layer_weight_matrix = self.next_layer.as_ref().unwrap().weight_matrix.clone();
+                let next_layer_du = self.next_layer.as_ref().unwrap().borrow().du.clone();
+                let next_layer_weight_matrix = self.next_layer.as_ref().unwrap().borrow().weight_matrix.clone();
                 let next_layer_weight_matrix = next_layer_weight_matrix.t();
 
                 let dy_du = &self.output_array * (Array2::from_elem(self.output_array.dim(), 1.0) - &self.output_array);
@@ -106,5 +105,15 @@ impl Layer {
                 panic!("calc_du_hidden_layer() is only for hidden layer");
             }
         }
+    }
+
+    pub fn aa(&mut self) {
+        let mut a = Layer::new(2, 3, LayerType::Hidden, 1);
+        let mut a_2 = Layer::new(2, 3, LayerType::Hidden, 1);
+        let b = Rc::new(RefCell::new(a));
+
+        b.borrow_mut().set_next_layer(Rc::new(RefCell::new(a_2)));
+
+        self.prev_layer = Some(Rc::clone(&b));
     }
 }

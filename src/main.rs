@@ -1,13 +1,26 @@
 #[macro_use]
 extern crate ndarray;
 
+use std::{rc::Rc, cell::RefCell};
+
 use ndarray::{arr2, Array, Array1, Array2, Zip};
 
-use rust_dl_bas::act_fn;
+use rust_dl_bas::{act_fn, layer::{Layer, LayerType}, network::Network};
+
+
+
 
 fn main() {
+    let batch_size = 1;
+    let input_size = 1;
+    let output_size = 1;
+    let hidden_size = 3;
 
-    forward();
+    let mut network = Network::new();
+    let hidden_layer = Rc::new(RefCell::new(Layer::new(input_size, hidden_size, LayerType::Hidden, batch_size)));
+    let output_layer = Rc::new(RefCell::new(Layer::new(hidden_size, output_size, LayerType::Output, batch_size)));
+    network.add_layer(hidden_layer);
+    network.add_layer(output_layer);
 }
 
 pub fn mat() {

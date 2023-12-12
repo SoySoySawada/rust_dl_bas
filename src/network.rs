@@ -1,9 +1,9 @@
-use std::rc::Rc;
+use std::{rc::Rc, cell::RefCell};
 
-use crate::layer;
+use crate::layer::Layer;
 
 pub struct Network {
-    pub layers: Vec<Rc<layer::Layer>>,
+    pub layers: Vec<Rc<RefCell<Layer>>>,
 }
 
 impl Network {
@@ -13,15 +13,14 @@ impl Network {
         }
     }
 
-    // fn add_layer(&mut self, layer: Rc<layer::Layer>) {
-    //     let prev_layer = Rc::clone(self.layers.last_mut().unwrap());
-    //     let add_layer = Rc::clone(&layer);
+    pub fn add_layer(&mut self, layer: Rc<RefCell<Layer>>) {
+        let prev_layer = self.layers.last();
 
-    //     if self.layers.len() > 0 {
-    //         add_layer.set_prev_layer(prev_layer);
-    //         prev_layer.set_next_layer(add_layer);
-    //     }
+        if let Some(prev_layer) = prev_layer {
+            layer.borrow_mut().set_prev_layer(Rc::clone(prev_layer));
+            prev_layer.borrow_mut().set_next_layer(Rc::clone(&layer));
+        }
 
-    //     self.layers.push(add_layer);
-    // }
+        self.layers.push(layer);
+    }
 }
