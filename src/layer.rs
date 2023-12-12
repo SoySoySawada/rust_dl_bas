@@ -23,13 +23,19 @@ impl Layer {
     pub fn new(input_synapse_num: usize, cell_num: usize, layer_type: LayerType, batch_size: usize) -> Layer {
         Layer {
             weight_matrix: Array2::zeros((input_synapse_num, cell_num)),
-            bias_array: Array1::zeros(cell_num),
+            bias_array: Array1::from_elem(cell_num, 1.0),
             output_array: Array2::zeros((batch_size, cell_num)),
             du: Array2::zeros((batch_size, cell_num)),
             layer_type,
             prev_layer: None,
             next_layer: None,
         }
+    }
+    pub fn have_prev_layer(&self) -> bool {
+        self.prev_layer.is_some()
+    }
+    pub fn have_next_layer(&self) -> bool {
+        self.next_layer.is_some()
     }
     
     pub fn set_next_layer(&mut self, next_layer: Rc<RefCell<Layer>>) {
@@ -49,6 +55,7 @@ impl Layer {
         let u = x.dot(&self.weight_matrix) + &self.bias_array;
 
         self.output_array = u.map(|u| act_fn::sigmoid(*u));
+        // println!("output_array = {:?}", &self.output_array);
     }
 
     pub fn calc_output_other_layer(&mut self) {
@@ -68,6 +75,8 @@ impl Layer {
                 self.output_array = act_fn::batch_softmax(&u);
             },
         }
+
+        // println!("output_array = {:?}", &self.output_array);
     }
 
     /// 活性化関数：ソフトマックス関数 として実装
@@ -107,13 +116,29 @@ impl Layer {
         }
     }
 
-    pub fn aa(&mut self) {
-        let mut a = Layer::new(2, 3, LayerType::Hidden, 1);
-        let mut a_2 = Layer::new(2, 3, LayerType::Hidden, 1);
-        let b = Rc::new(RefCell::new(a));
+    pub fn update_first_layer(&mut self, x: &Array2<f64>, learn_rate: f64) {
+        self.weight_matrix = &self.weight_matrix - learn_rate * self.calc_dw_first_layer(x);
+        self.bias_array = &self.bias_array - learn_rate * self.calc_db();
+    }
 
-        b.borrow_mut().set_next_layer(Rc::new(RefCell::new(a_2)));
+    fn calc_dw_first_layer(&self, x: &Array2<f64>) -> Array2<f64> {
+        let dw = x.t().dot(&self.du);
+        dw
+    }
 
-        self.prev_layer = Some(Rc::clone(&b));
+    pub fn update_other_layer(&mut self, learn_rate: f64) {
+        self.weight_matrix = &self.weight_matrix - learn_rate * self.calc_dw_other_layer();
+        self.bias_array = &self.bias_array - learn_rate * self.calc_db();
+    }
+
+    fn calc_dw_other_layer(&self) -> Array2<f64> {
+        let prev_layer_output_array = self.prev_layer.as_ref().unwrap().borrow().output_array.clone();
+        let dw = prev_layer_output_array.t().dot(&self.du);
+        dw
+    }
+
+    fn calc_db(&self) -> Array1<f64> {
+        let db = self.du.sum_axis(ndarray::Axis(0));
+        db
     }
 }

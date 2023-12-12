@@ -11,16 +11,37 @@ use rust_dl_bas::{act_fn, layer::{Layer, LayerType}, network::Network};
 
 
 fn main() {
-    let batch_size = 1;
+    let batch_size = 3;
     let input_size = 1;
     let output_size = 1;
     let hidden_size = 3;
 
     let mut network = Network::new();
-    let hidden_layer = Rc::new(RefCell::new(Layer::new(input_size, hidden_size, LayerType::Hidden, batch_size)));
+    let hidden_layer1 = Rc::new(RefCell::new(Layer::new(input_size, hidden_size, LayerType::Hidden, batch_size)));
+    let hidden_layer2 = Rc::new(RefCell::new(Layer::new(hidden_size, hidden_size, LayerType::Hidden, batch_size)));
     let output_layer = Rc::new(RefCell::new(Layer::new(hidden_size, output_size, LayerType::Output, batch_size)));
-    network.add_layer(hidden_layer);
+    network.add_layer(hidden_layer1);
+    network.add_layer(hidden_layer2);
     network.add_layer(output_layer);
+
+    println!("layer0 have prev:{}", network.layers[0].as_ref().borrow_mut().have_prev_layer());
+    println!("layer0 have next:{}", network.layers[0].as_ref().borrow_mut().have_next_layer());
+    println!("layer1 have prev:{}", network.layers[1].as_ref().borrow_mut().have_prev_layer());
+    println!("layer1 have next:{}", network.layers[1].as_ref().borrow_mut().have_next_layer());
+    println!("layer2 have prev:{}", network.layers[2].as_ref().borrow_mut().have_prev_layer());
+    println!("layer2 have next:{}", network.layers[2].as_ref().borrow_mut().have_next_layer());
+    
+
+    let mut cnt = 1;
+    while cnt < 20000 {
+        let testdata: Array2<f64> = array![[0.0], [0.0], [1.0]];
+        let answer: Array2<f64> = array![[0.0], [0.0], [1.0]];
+        network.train(&testdata, &answer);
+        cnt += 1;
+    }
+
+    let result = network.calc_result(&array![[0.0], [0.0], [1.0]]);
+    println!("result = {:?}", &result);
 }
 
 pub fn mat() {
