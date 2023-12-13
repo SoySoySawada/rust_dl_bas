@@ -1,6 +1,7 @@
 use std::{rc::Rc, cell::RefCell};
 
 use ndarray::{Array1, Array2};
+use rand::Rng;
 
 use crate::act_fn;
 
@@ -157,45 +158,280 @@ impl Layer {
         do_output
     }
 
-    // fn calc_do_other_layer(&self) -> Array2<f64> {
-    //     let next_layer_do: Array2<f64> = self.next_layer.as_ref().unwrap().borrow().dv_output.clone();
-    //     let dy_dy: Array2<f64> = self.output_array.clone().map()
-    //     let do_output = 
-    // }
 }
 
-trait LayerBase {
-    /// 出力層: その場で計算
-    /// 隠れ層: プロパティに保持している値を返却
-    fn div_output(&self) -> Array2<f64>;
+pub trait LayerBase {
+    fn weight(&self) -> &Array2<f64>;
+    fn bias(&self) -> &Array1<f64>;
+    fn output(&self) -> &Array2<f64>;
+    fn input_grad(&self) -> &Array2<f64>;
+
+    fn set_next_layer(&mut self, next_layer: Rc<RefCell<dyn LayerBase>>);
+    fn set_input(&mut self, x: &Array2<f64>);
+    fn set_answer(&mut self, t: &Array2<f64>);
+
+    fn calc_output(&mut self, x: &Array2<f64>);
+    // fn calc_delta(&mut self);
+
+    /// weight, bias, inputの勾配を計算する
+    fn calc_grad(&mut self);
+
+    /// 保持している勾配情報を消費して重み、バイアスを更新する
+    fn update(&mut self, lr: f64);
 }
+
 
 /// ソフトマックス関数をするやつ
-struct OutputLayer {
+pub struct OutputLayer {
+    weight: Array2<f64>,
+    bias: Array1<f64>,
+    input: Array2<f64>,
     output: Array2<f64>,
-    output_div: Array2<f64>,
-    input_div: Array2<f64>,
+    delta: Array2<f64>,
+    weight_grad: Option<Array2<f64>>,
+    bias_grad: Option<Array1<f64>>,
+    input_grad: Option<Array2<f64>>,
+    t: Option<Array2<f64>>,
 }
 
 impl OutputLayer {
-    fn calc_output_div(&mut self, t: &Array2<f64>) {
-        let output_div: Array2<f64> = (-t) / &self.output;
-        self.output_div = output_div
+    pub fn new(input_num: usize, output_num: usize, batch_num: usize) -> OutputLayer {
+        OutputLayer {
+            weight: Array2::zeros((input_num, output_num)),
+            bias: Array1::from_elem(output_num, 1.0),
+            input: Array2::zeros((batch_num, input_num)),
+            output: Array2::zeros((batch_num, output_num)),
+            delta: Array2::zeros((batch_num, output_num)),
+            weight_grad: None,
+            bias_grad: None,
+            input_grad: None,
+            t: None,
+        }
     }
 
-    fn calc_input_div(&mut self) {
-        let mut div_calc1: Array2<f64> = Array2::zeros(self.input_div.dim());
+    pub fn new_rand(input_num: usize, output_num: usize, batch_num: usize, ) -> OutputLayer {
+        let mut weight = Array2::zeros((input_num, output_num));
+        weight.map_mut(|x: &mut f64| *x = Rng::gen(&mut rand::thread_rng()));
+        let mut bias = Array1::zeros(output_num);
+        bias.map_mut(|x: &mut f64| *x = Rng::gen(&mut rand::thread_rng()));
 
-        for batch_idx in 0..self.input_div.shape()[0] {
-            for input_idx in 0..self.input_div.shape()[1] {
-                for output_idx in 0..self.output.shape()[1] {
-                    div_calc1[[batch_idx, input_idx]] = if input_idx == output_idx {
-                        self.output[[batch_idx, output_idx]] * (1.0 - self.output[[batch_idx, output_idx]])
-                    } else {
-                        -self.output[[batch_idx, output_idx]] * self.output[[batch_idx, input_idx]]
-                    }
-                }
+        println!("weight = {:?}", &weight);
+        println!("bias = {:?}", &bias);
+
+        OutputLayer {
+            weight: weight,
+            bias: bias,
+            input: Array2::zeros((batch_num, input_num)),
+            output: Array2::zeros((batch_num, output_num)),
+            delta: Array2::zeros((batch_num, output_num)),
+            weight_grad: None,
+            bias_grad: None,
+            input_grad: None,
+            t: None,
+        }
+    }
+
+    fn calc_delta(&mut self) {
+        if let Some(t) = self.t.take() {
+            self.delta = &self.output - t;
+            // println!("delta = {:?}", &self.delta);
+        } else {
+            panic!("t is not set");
+        }
+    }
+
+    fn set_testdata(&mut self, t: &Array2<f64>) {
+        self.t.replace(t.clone());
+    }
+}
+
+impl LayerBase for OutputLayer {
+    fn input_grad(&self) -> &Array2<f64> {
+        &self.input_grad.as_ref().unwrap()
+    }
+
+    fn bias(&self) -> &Array1<f64> {
+        &self.bias
+    }
+
+    fn weight(&self) -> &Array2<f64> {
+        &self.weight
+    }
+
+    fn output(&self) -> &Array2<f64> {
+        &self.output
+    }
+
+    fn set_input(&mut self, x: &Array2<f64>) {
+        self.input = x.clone();
+    }
+
+    fn set_next_layer(&mut self, _next_layer: Rc<RefCell<dyn LayerBase>>) {
+        panic!("OutputLayer can not have next layer");
+    }
+
+    fn set_answer(&mut self, t: &Array2<f64>) {
+        // println!("t = {:?}", &t);
+        self.set_testdata(t);
+    }
+
+    fn calc_output(&mut self, x: &Array2<f64>) {
+        self.set_input(x);
+        let u = self.input.dot(&self.weight) + &self.bias;
+        // println!("u = {:?}", &u);
+        let output = act_fn::batch_softmax(&u);
+        println!("output = {:?}", &output);
+        self.output = output;
+    }
+
+    /// 保持しているテストデータを消費して計算する
+    fn calc_grad(&mut self) {
+        self.calc_delta();
+
+        let weight_grad = self.input.t().dot(&self.delta);
+        self.weight_grad.replace(weight_grad);
+
+        let bias_grad = self.delta.sum_axis(ndarray::Axis(0));
+        self.bias_grad.replace(bias_grad);
+
+
+        // println!("delta = {:?}", &self.delta);
+        // println!("weight = {:?}", &self.weight);
+        self.input_grad.replace(self.delta.dot(&self.weight.t()));
+        // println!("input_grad = {:?}", &self.input_grad);
+    }
+
+    fn update(&mut self, lr: f64) {
+        println!("ois");
+        if let Some(weight_grad) = self.weight_grad.take() {
+            if let Some(bias_grad) = self.bias_grad.take() {
+                self.weight = &self.weight - lr * weight_grad;
+                self.bias = &self.bias - lr * bias_grad;
+            } else {
+                panic!("bias_grad is not set");
             }
+        } else {
+            panic!("weight_grad is not set");
+        }
+    }
+}
+
+
+pub struct HiddenLayer {
+    input: Array2<f64>,
+    output: Array2<f64>,
+    weight: Array2<f64>,
+    bias: Array1<f64>,
+    weight_grad: Option<Array2<f64>>,
+    bias_grad: Option<Array1<f64>>,
+    delta: Array2<f64>,
+    input_grad: Option<Array2<f64>>,
+    next_layer: Option<Rc<RefCell<dyn LayerBase>>>,
+}
+
+impl HiddenLayer {
+    pub fn new(input_num: usize, output_num: usize, batch_num: usize) -> HiddenLayer {
+        HiddenLayer {
+            input: Array2::zeros((batch_num, input_num)),
+            output: Array2::zeros((batch_num, output_num)),
+            weight: Array2::zeros((input_num, output_num)),
+            bias: Array1::from_elem(output_num, 1.0),
+            weight_grad: None,
+            bias_grad: None,
+            delta: Array2::zeros((batch_num, output_num)),
+            input_grad: None,
+            next_layer: None,
+        }
+    }
+
+    fn calc_delta(&mut self) {
+        if let Some(next_layer) = self.next_layer.as_ref() {
+            let output_grad: Array2<f64> = next_layer.borrow().input_grad().clone();
+            let dy_du: Array2<f64> = &self.output * (Array2::from_elem(self.output.dim(), 1.0) - &self.output);
+
+            self.delta = output_grad * dy_du;
+        } else {
+            panic!("next_layer is not set");
+        }
+    }
+
+    pub fn set_next_layer(&mut self, next_layer: Rc<RefCell<dyn LayerBase>>) {
+        assert!(next_layer.borrow().weight().shape()[0] == self.weight.shape()[1], "next_layer.borrow().weight().shape()[0] != self.weight.shape()[1]");
+        self.next_layer.replace(next_layer);
+    }
+}
+
+impl LayerBase for HiddenLayer {
+    fn weight(&self) -> &Array2<f64> {
+        &self.weight
+    }
+
+    fn bias(&self) -> &Array1<f64> {
+        &self.bias
+    }
+
+    fn output(&self) -> &Array2<f64> {
+        &self.output
+    }
+
+    fn set_input(&mut self, x: &Array2<f64>) {
+        self.input = x.clone();
+    }
+
+    fn set_next_layer(&mut self, next_layer: Rc<RefCell<dyn LayerBase>>) {
+        self.set_next_layer(next_layer);
+    }
+
+    fn set_answer(&mut self, t: &Array2<f64>) {
+        panic!("HiddenLayer can not have answer");
+    }
+
+    fn input_grad(&self) -> &Array2<f64> {
+        &self.input_grad.as_ref().unwrap()
+    }
+
+    fn calc_output(&mut self, x: &Array2<f64>) {
+        assert_eq!(x.shape()[1] , self.weight.shape()[0], "x.shape()[1] != self.weight.shape()[0]");
+        self.set_input(x);
+        let u = self.input.dot(&self.weight) + &self.bias;
+        println!("u = {:?}", &u);
+        let output = u.map(|&x| act_fn::sigmoid(x));
+        println!("output = {:?}", &output);
+        self.output = output;
+    }
+
+    fn calc_grad(&mut self) {
+        self.calc_delta();
+
+
+        println!("delta = {:?}", &self.delta);
+        println!("input = {:?}", &self.input);
+        let weight_grad = self.input.t().dot(&self.delta);
+        println!("weight_grad = {:?}", &weight_grad);
+        self.weight_grad.replace(weight_grad);
+
+        let bias_grad = self.delta.sum_axis(ndarray::Axis(0));
+        self.bias_grad.replace(bias_grad);
+
+        self.input_grad.replace(self.delta.dot(&self.weight.t()));
+    }
+
+    fn update(&mut self, lr: f64) {
+        println!("ois hid");
+        if let Some(weight_grad) = self.weight_grad.take() {
+            if let Some(bias_grad) = self.bias_grad.take() {
+                println!("iketeru");
+                println!("weight = {:?}", &self.weight);
+                println!("weight_grad = {:?}", &weight_grad);
+                self.weight = &self.weight - lr * weight_grad;
+                println!("iketeru!");
+                self.bias = &self.bias - lr * bias_grad;
+                println!("iketeru!!");
+            } else {
+                panic!("bias_grad is not set");
+            }
+        } else {
+            panic!("weight_grad is not set");
         }
     }
 }
