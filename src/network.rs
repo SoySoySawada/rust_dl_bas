@@ -31,17 +31,25 @@ impl Network {
 
         let last_layer = self.layers.last().unwrap();
         last_layer.borrow_mut().calc_du_output_layer(t);
+        println!("last layer du = {:?}", &last_layer.as_ref().borrow_mut().du);
 
         for layer in self.layers.iter().rev().skip(1) {
             layer.borrow_mut().calc_du_hidden_layer();
+            println!("layer du = {:?}", &layer.as_ref().borrow_mut().du);
         }
 
-        let learn_rate = 0.01;
+        println!("layer0 du = {:?}", &self.layers[0].as_ref().borrow_mut().du);
+        println!("layer1 du = {:?}", &self.layers[1].as_ref().borrow_mut().du);
+        // println!("layer2 du = {:?}", &self.layers[2].as_ref().borrow_mut().du);
+
+        let learn_rate = 0.05;
         let first_layer = self.layers.first().unwrap();
         first_layer.borrow_mut().update_first_layer(x, learn_rate);
         for layer in self.layers.iter().skip(1) {
             layer.borrow_mut().update_other_layer(learn_rate);
         }
+
+        println!("train now");
     }
 
     pub fn calc_result(&mut self, x: &Array2<f64>) {
@@ -60,4 +68,5 @@ impl Network {
         let last_layer = self.layers.last().unwrap();
         last_layer.borrow().output_array.clone()
     }
+
 }

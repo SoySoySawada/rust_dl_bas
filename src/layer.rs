@@ -11,9 +11,10 @@ pub enum LayerType {
 
 pub struct Layer {
     pub weight_matrix: Array2<f64>,
-    bias_array: Array1<f64>,
+    pub bias_array: Array1<f64>,
     pub output_array: Array2<f64>,
     pub du: Array2<f64>,
+    pub dv_output: Array2<f64>,
     layer_type: LayerType,
     next_layer: Option<Rc<RefCell<Layer>>>,
     prev_layer: Option<Rc<RefCell<Layer>>>,
@@ -26,6 +27,7 @@ impl Layer {
             bias_array: Array1::from_elem(cell_num, 1.0),
             output_array: Array2::zeros((batch_size, cell_num)),
             du: Array2::zeros((batch_size, cell_num)),
+            dv_output: Array2::zeros((batch_size, cell_num)),
             layer_type,
             prev_layer: None,
             next_layer: None,
@@ -108,6 +110,10 @@ impl Layer {
                 let dy_du = &self.output_array * (Array2::from_elem(self.output_array.dim(), 1.0) - &self.output_array);
                 let de_dy = next_layer_du.dot(&next_layer_weight_matrix);
 
+                println!("next_layer_du = {:?}", &next_layer_du);
+                println!("dy_du = {:?}", &dy_du);   // DEL 出力は今回同じだから同じ値になるのは変じゃない
+                println!("de_dy = {:?}", &de_dy);   // DEL 変じゃね b*n(l-1)になるはず？
+
                 self.du = dy_du * de_dy;
             },
             _ => {
@@ -122,7 +128,9 @@ impl Layer {
     }
 
     fn calc_dw_first_layer(&self, x: &Array2<f64>) -> Array2<f64> {
+        println!("x = {:?}", &x);
         let dw = x.t().dot(&self.du);
+        println!("dw = {:?}", &dw);
         dw
     }
 
@@ -133,12 +141,61 @@ impl Layer {
 
     fn calc_dw_other_layer(&self) -> Array2<f64> {
         let prev_layer_output_array = self.prev_layer.as_ref().unwrap().borrow().output_array.clone();
+        println!("prev_layer_output_array = {:?}", &prev_layer_output_array);
         let dw = prev_layer_output_array.t().dot(&self.du);
+        println!("dw = {:?}", &dw);
         dw
     }
 
     fn calc_db(&self) -> Array1<f64> {
         let db = self.du.sum_axis(ndarray::Axis(0));
         db
+    }
+
+    fn calc_do_output_layer(&self, t: &Array2<f64>) -> Array2<f64> {
+        let do_output: Array2<f64> = (-t) / &self.output_array;
+        do_output
+    }
+
+    // fn calc_do_other_layer(&self) -> Array2<f64> {
+    //     let next_layer_do: Array2<f64> = self.next_layer.as_ref().unwrap().borrow().dv_output.clone();
+    //     let dy_dy: Array2<f64> = self.output_array.clone().map()
+    //     let do_output = 
+    // }
+}
+
+trait LayerBase {
+    /// 出力層: その場で計算
+    /// 隠れ層: プロパティに保持している値を返却
+    fn div_output(&self) -> Array2<f64>;
+}
+
+/// ソフトマックス関数をするやつ
+struct OutputLayer {
+    output: Array2<f64>,
+    output_div: Array2<f64>,
+    input_div: Array2<f64>,
+}
+
+impl OutputLayer {
+    fn calc_output_div(&mut self, t: &Array2<f64>) {
+        let output_div: Array2<f64> = (-t) / &self.output;
+        self.output_div = output_div
+    }
+
+    fn calc_input_div(&mut self) {
+        let mut div_calc1: Array2<f64> = Array2::zeros(self.input_div.dim());
+
+        for batch_idx in 0..self.input_div.shape()[0] {
+            for input_idx in 0..self.input_div.shape()[1] {
+                for output_idx in 0..self.output.shape()[1] {
+                    div_calc1[[batch_idx, input_idx]] = if input_idx == output_idx {
+                        self.output[[batch_idx, output_idx]] * (1.0 - self.output[[batch_idx, output_idx]])
+                    } else {
+                        -self.output[[batch_idx, output_idx]] * self.output[[batch_idx, input_idx]]
+                    }
+                }
+            }
+        }
     }
 }
