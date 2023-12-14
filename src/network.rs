@@ -62,6 +62,7 @@ impl Network {
 
 }
 
+#[derive(Debug, Clone)]
 struct Neural {
     hidden_weight: Array2<f64>,
     output_weight: Array2<f64>,
@@ -240,6 +241,16 @@ mod test_neural {
         let o_w_delta2_1 = o_de_du[(0, 0)] * h_y2;
         let o_w_delta2_2 = o_de_du[(0, 1)] * h_y2;
 
+        let h_de_dy: Array2<f64> = arr2(&[[ o_de_du[(0, 0)] * &output_weight[(0, 1)] + o_de_du[(0, 1)] * &output_weight[(1, 1)], 
+                                                o_de_du[(0, 0)] * &output_weight[(0, 2)] + o_de_du[(0, 1)] * &output_weight[(1, 2)]]]);
+        let h_de_du: Array2<f64> = arr2(&[[h_de_dy[(0, 0)] * h_y1 * (1.0 - h_y1), h_de_dy[(0, 1)] * h_y2 * (1.0 - h_y2)]]);
+        let h_w_delta0_1 = h_de_du[(0, 0)] * 1.0;
+        let h_w_delta0_2 = h_de_du[(0, 1)] * 1.0;
+        let h_w_delta1_1 = h_de_du[(0, 0)] * 0.0;
+        let h_w_delta1_2 = h_de_du[(0, 1)] * 0.0;
+        let h_w_delta2_1 = h_de_du[(0, 0)] * 1.0;
+        let h_w_delta2_2 = h_de_du[(0, 1)] * 1.0; 
+
         neural.update_weight(input, t, epsilon, mu);
         assert_eq!(neural.output_weight[(0, 0)], output_weight[(0, 0)] - o_w_delta0_1 * epsilon);
         assert_eq!(neural.output_weight[(0, 1)], output_weight[(0, 1)] - o_w_delta1_1 * epsilon);
@@ -249,6 +260,15 @@ mod test_neural {
         assert_eq!(neural.output_weight[(1, 2)], output_weight[(1, 2)] - o_w_delta2_2 * epsilon);
         // assert_eq!(neural.output_momentum, arr2(&[[-o_w_delta0_1 * epsilon, -o_w_delta1_1 * epsilon, -o_w_delta2_1 * epsilon], 
         //                                           [-o_w_delta0_2 * epsilon, -o_w_delta1_2 * epsilon, -o_w_delta2_2 * epsilon]]));
-        assert_eq!(neural.output_momentum, neural.output_weight - output_weight);
+        // assert_eq!(neural.output_momentum, neural.output_weight - output_weight);
+
+
+        // assert_eq!(neural.hidden_weight[(0, 0)], hidden_weight[(0, 0)] - h_w_delta0_1 * epsilon);
+        assert_eq!(neural.hidden_weight[(0, 1)], hidden_weight[(0, 1)] - h_w_delta1_1 * epsilon);
+        // assert_eq!(neural.hidden_weight[(0, 2)], hidden_weight[(0, 2)] - h_w_delta2_1 * epsilon);
+        // assert_eq!(neural.hidden_weight[(1, 0)], hidden_weight[(1, 0)] - h_w_delta0_2 * epsilon);
+        assert_eq!(neural.hidden_weight[(1, 1)], hidden_weight[(1, 1)] - h_w_delta1_2 * epsilon);
+        // assert_eq!(neural.hidden_weight[(1, 2)], hidden_weight[(1, 2)] - h_w_delta2_2 * epsilon);
+        assert_eq!(neural.hidden_momentum, neural.hidden_weight - hidden_weight);
     }
 }
