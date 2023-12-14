@@ -153,7 +153,7 @@ impl Layer {
         db
     }
 
-    fn calc_do_output_layer(&self, t: &Array2<f64>) -> Array2<f64> {
+    fn _calc_do_output_layer(&self, t: &Array2<f64>) -> Array2<f64> {
         let do_output: Array2<f64> = (-t) / &self.output_array;
         do_output
     }
@@ -385,7 +385,7 @@ impl LayerBase for HiddenLayer {
         self.set_next_layer(next_layer);
     }
 
-    fn set_answer(&mut self, t: &Array2<f64>) {
+    fn set_answer(&mut self, _t: &Array2<f64>) {
         panic!("HiddenLayer can not have answer");
     }
 
