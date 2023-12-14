@@ -276,11 +276,14 @@ impl LayerBase for OutputLayer {
     }
 
     fn calc_output(&mut self, x: &Array2<f64>) {
+        println!("O weight = {:?}", &self.weight);
+        println!("O bias = {:?}", &self.bias);
+        println!("O input = {:?}", &x);
         self.set_input(x);
         let u = self.input.dot(&self.weight) + &self.bias;
-        // println!("u = {:?}", &u);
+        println!("O u = {:?}", &u);
         let output = act_fn::batch_softmax(&u);
-        println!("output = {:?}", &output);
+        println!("O output = {:?}", &output);
         self.output = output;
     }
 
@@ -392,11 +395,15 @@ impl LayerBase for HiddenLayer {
 
     fn calc_output(&mut self, x: &Array2<f64>) {
         assert_eq!(x.shape()[1] , self.weight.shape()[0], "x.shape()[1] != self.weight.shape()[0]");
+        
+        println!("H weight = {:?}", &self.weight);
+        println!("H bias = {:?}", &self.bias);
+        println!("H input = {:?}", &x);
         self.set_input(x);
         let u = self.input.dot(&self.weight) + &self.bias;
-        println!("u = {:?}", &u);
+        println!("H u = {:?}", &u);
         let output = u.map(|&x| act_fn::sigmoid(x));
-        println!("output = {:?}", &output);
+        println!("H output = {:?}", &output);
         self.output = output;
     }
 
