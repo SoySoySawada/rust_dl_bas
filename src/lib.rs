@@ -1,4 +1,4 @@
-#[macro_use(s)]
+#[macro_use(s, concatenate)]
 extern crate ndarray;
 
 pub mod act_fn;
